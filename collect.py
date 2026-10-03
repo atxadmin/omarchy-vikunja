@@ -140,6 +140,18 @@ def toggle_task(base, token, task_id, target_done):
         sys.exit(3)
 
 
+def create_task(base, token, title, project_id, due=None):
+    # Create = PUT /projects/{id}/tasks on Vikunja 2.x.
+    payload = {"title": title}
+    if due:
+        payload["due_date"] = due
+    created = api(base, token, "PUT", "/projects/%d/tasks" % project_id, payload)
+    if not created.get("id"):
+        print("ERROR: task not confirmed created", file=sys.stderr)
+        sys.exit(3)
+    return created
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true", help="write the state record")
@@ -148,6 +160,12 @@ def main():
                     help="set a task done (with --done) or pending (default), then refresh")
     ap.add_argument("--done", action="store_true",
                     help="with --toggle: mark done instead of pending")
+    ap.add_argument("--create", metavar="TITLE",
+                    help="create a task (requires --project)")
+    ap.add_argument("--project", type=int, metavar="PROJECT_ID",
+                    help="with --create: project to add the task to")
+    ap.add_argument("--due", metavar="YYYY-MM-DD",
+                    help="with --create: due date")
     args = ap.parse_args()
 
     if args.clear:
@@ -159,6 +177,12 @@ def main():
 
     if args.toggle:
         toggle_task(base, token, args.toggle, args.done)
+
+    if args.create:
+        if not args.project:
+            print("ERROR: --create requires --project PROJECT_ID", file=sys.stderr)
+            sys.exit(2)
+        create_task(base, token, args.create, args.project, args.due)
 
     state = fetch_state(base, token)
     text = json.dumps(state, indent=2)
