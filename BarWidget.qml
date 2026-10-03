@@ -143,7 +143,7 @@ Panel {
     property var collapsed: ({})
 
     PanelKeyCatcher {
-      onEscapePressed: popup.close()
+      onCloseRequested: popup.close()
     }
 
     Flickable {
