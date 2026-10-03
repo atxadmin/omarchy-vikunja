@@ -117,12 +117,16 @@ Panel {
     bar: root.bar
     owner: root
     open: root.opened
-    contentWidth: Style.space(300)
-    contentHeight: Math.min(Style.space(400), popup.availableCardHeight)
+    contentWidth: Style.space(420)
+    contentHeight: Math.min(Style.space(500), popup.availableCardHeight)
+
+    // Project sections remember their folded state by title, so a fold
+    // survives the list rebuilding on every collector write.
+    property var collapsed: ({})
 
     Flickable {
       anchors.fill: parent
-      anchors.margins: Style.space(4)
+      anchors.margins: Style.space(6)
       contentWidth: width
       contentHeight: list.implicitHeight
       clip: true
@@ -130,6 +134,7 @@ Panel {
       ColumnLayout {
         id: list
         width: parent.width
+        spacing: Style.space(4)
 
         Repeater {
           model: root.state && root.state.projects ? root.state.projects : []
@@ -138,67 +143,149 @@ Panel {
             required property var modelData
             id: projectColumn
             Layout.fillWidth: true
-            spacing: Style.space(2)
+            spacing: Style.space(4)
 
-            Text {
+            readonly property bool collapsed: popup.collapsed[modelData.title] === true
+
+            // Section header: title, count, and a fold arrow, the whole
+            // row clickable to toggle the section.
+            Rectangle {
               Layout.fillWidth: true
-              text: "%1 (%2)".arg(projectColumn.modelData.title)
-                                   .arg(projectColumn.modelData.tasks.length)
-              color: Color.accent
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              font.bold: true
+              implicitHeight: headerRow.implicitHeight + Style.space(8)
+              radius: Style.space(8)
+              color: headerMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10)
+                   : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+
+              RowLayout {
+                id: headerRow
+                anchors.fill: parent
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(8)
+
+                Text {
+                  text: projectColumn.modelData.title
+                  color: Color.foreground
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.subtitle
+                  font.bold: true
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: "(" + projectColumn.modelData.tasks.length + ")"
+                  color: root.themeSecondary
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.body
+                }
+
+                Text {
+                  text: projectColumn.collapsed ? "▸" : "▾"
+                  color: Color.foreground
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.body
+                }
+              }
+
+              MouseArea {
+                id: headerMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  var next = {}
+                  for (var key in popup.collapsed) next[key] = popup.collapsed[key]
+                  if (next[projectColumn.modelData.title]) delete next[projectColumn.modelData.title]
+                  else next[projectColumn.modelData.title] = true
+                  popup.collapsed = next
+                }
+              }
             }
 
             Repeater {
               model: projectColumn.modelData.tasks
 
-              RowLayout {
+              // One task per card, the shape the notification plugin uses:
+              // a raised rounded rect of foreground at low opacity, with a
+              // hover tint, so a run of tasks reads as a pile of things
+              // rather than a spreadsheet.
+              Rectangle {
                 required property var modelData
-                id: taskRow
+                id: taskCard
                 Layout.fillWidth: true
-                spacing: Style.space(3)
+                visible: !projectColumn.collapsed
+                Layout.preferredHeight: cardContent.implicitHeight + Style.space(16)
+                radius: Style.space(10)
+                color: cardMouse.containsMouse
+                  ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.11)
+                  : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
 
-                Rectangle {
-                  Layout.preferredWidth: Style.space(10)
-                  Layout.preferredHeight: Style.space(10)
-                  radius: Style.space(2)
-                  color: "transparent"
-                  border.width: 1
-                  border.color: taskRow.modelData.due && taskRow.modelData.due.overdue
-                    ? Color.urgent
-                    : taskRow.modelData.due && taskRow.modelData.due.today
-                      ? root.themeWarning
-                      : root.themeOutline
+                Behavior on color { ColorAnimation { duration: 90 } }
 
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleTask(taskRow.modelData.id)
+                RowLayout {
+                  id: cardContent
+                  anchors.fill: parent
+                  anchors.leftMargin: Style.space(12)
+                  anchors.rightMargin: Style.space(12)
+                  spacing: Style.space(10)
+
+                  Rectangle {
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.preferredWidth: Style.space(14)
+                    Layout.preferredHeight: Style.space(14)
+                    radius: Style.space(3)
+                    color: "transparent"
+                    border.width: 1
+                    border.color: taskCard.modelData.due && taskCard.modelData.due.overdue
+                      ? Color.urgent
+                      : taskCard.modelData.due && taskCard.modelData.due.today
+                        ? root.themeWarning
+                        : root.themeOutline
+
+                    MouseArea {
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.toggleTask(taskCard.modelData.id)
+                    }
+                  }
+
+                  ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Style.space(1)
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: taskCard.modelData.title
+                      textFormat: Text.PlainText
+                      color: Color.foreground
+                      font.family: Style.font.family
+                      font.pixelSize: Style.font.subtitle
+                      wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      visible: taskCard.modelData.due !== null
+                      text: taskCard.modelData.due
+                        ? "Due " + Qt.formatDate(taskCard.modelData.due.date, "d MMM") : ""
+                      color: taskCard.modelData.due && taskCard.modelData.due.overdue
+                        ? Color.urgent
+                        : taskCard.modelData.due && taskCard.modelData.due.today
+                          ? root.themeWarning
+                          : root.themeSecondary
+                      font.family: Style.font.family
+                      font.pixelSize: Style.font.body
+                    }
                   }
                 }
 
-                Text {
-                  id: taskLabel
-                  Layout.fillWidth: true
-                  text: taskRow.modelData.title
-                  color: root.barForeground
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.subtitle
-                  wrapMode: Text.WordWrap
-                }
-
-                Text {
-                  visible: taskRow.modelData.due !== null
-                  text: taskRow.modelData.due
-                    ? Qt.formatDate(taskRow.modelData.due.date, "d MMM") : ""
-                  color: taskRow.modelData.due && taskRow.modelData.due.overdue
-                    ? Color.urgent
-                    : taskRow.modelData.due && taskRow.modelData.due.today
-                      ? root.themeWarning
-                      : root.themeSecondary
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.body
+                MouseArea {
+                  id: cardMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  // Only the checkbox toggles; card clicks are for reading.
+                  propagateComposedEvents: false
+                  z: -1
                 }
               }
             }
