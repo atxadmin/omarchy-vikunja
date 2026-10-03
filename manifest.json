@@ -6,11 +6,10 @@
   "author": "burtoncommand",
   "license": "MIT",
   "description": "Vikunja task count in the bar, with a panel to browse and complete tasks from your self-hosted Vikunja instance.",
-  "kinds": ["service", "bar-widget", "panel"],
+  "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml",
-    "barWidget": "BarWidget.qml",
-    "panel": "Panel.qml"
+    "barWidget": "BarWidget.qml"
   }
 }
