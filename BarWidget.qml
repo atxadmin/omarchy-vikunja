@@ -136,6 +136,70 @@ Panel {
         width: parent.width
         spacing: Style.space(4)
 
+        // Panel header: title plus the counts that made the bar face
+        // change colour, so the top of the card explains itself.
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+
+          Text {
+            text: "Vikunja Tasks"
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.title
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: root.state
+              ? (root.state.total + " open")
+              : ""
+            color: root.themeSecondary
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+          }
+
+          Text {
+            visible: root.state && root.state.overdue > 0
+            text: root.state ? (root.state.overdue + " overdue") : ""
+            color: Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            font.bold: true
+          }
+
+          Text {
+            visible: root.state && root.state.due_today > 0
+            text: root.state ? (root.state.due_today + " today") : ""
+            color: root.themeWarning
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+          }
+
+          Rectangle {
+            Layout.preferredWidth: Style.space(10)
+            Layout.preferredHeight: Style.space(10)
+            radius: height / 2
+            color: "transparent"
+            border.width: 1
+            border.color: root.themeOutline
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.refresh()
+            }
+          }
+        }
+
+        Rectangle {
+          Layout.fillWidth: true
+          height: 1
+          color: root.themeOutline
+          opacity: 0.5
+        }
+
         Repeater {
           model: root.state && root.state.projects ? root.state.projects : []
 
