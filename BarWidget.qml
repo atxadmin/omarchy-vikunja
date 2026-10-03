@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 
@@ -367,64 +368,208 @@ Panel {
         }
 
         // ------------------------------------------------------------- create
-        // Quick-add: type a title, pick the project, Enter creates it.
+        // The stock PopupCard cannot take keyboard focus (its window type
+        // won't accept the layer-shell focus attachment), so an inline
+        // TextField would be dead. Instead an "+ Add task" button opens a
+        // small focused PanelWindow, the same approach the clipboard
+        // plugin's search box uses.
         Rectangle {
           Layout.fillWidth: true
-          implicitHeight: createRow.implicitHeight + Style.space(16)
+          implicitHeight: addLabel.implicitHeight + Style.space(16)
           radius: Style.space(10)
-          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+          color: addRowMouse.containsMouse
+            ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.11)
+            : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+
+          Behavior on color { ColorAnimation { duration: 90 } }
 
           RowLayout {
-            id: createRow
+            id: addLabel
             anchors.fill: parent
             anchors.leftMargin: Style.space(12)
             anchors.rightMargin: Style.space(12)
             spacing: Style.space(8)
 
-            TextField {
-              id: newTaskInput
-              Layout.fillWidth: true
-              placeholderText: "New task…"
+            Text {
+              text: "+ Add task"
               color: Color.foreground
-              placeholderTextColor: root.themeSecondary
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              background: null
-              onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText)
-
-              Keys.onEscapePressed: {
-                text = ""
-                root.close()
-              }
-            }
-
-            ComboBox {
-              id: projectPicker
-              Layout.preferredWidth: Style.space(110)
-              model: {
-                var names = []
-                if (root.state && root.state.projects)
-                  for (var i = 0; i < root.state.projects.length; i++)
-                    names.push(root.state.projects[i].title)
-                return names
-              }
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
 
-            Rectangle {
-              Layout.preferredWidth: Style.space(10)
-              Layout.preferredHeight: Style.space(10)
-              radius: height / 2
-              color: Color.accent
-              opacity: addMouse.containsMouse ? 1 : 0.7
+            Text {
+              Layout.fillWidth: true
+              visible: root.state && root.state.projects
+              text: "in " + (projectPicker.displayText || "")
+              color: root.themeSecondary
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+          }
 
-              MouseArea {
-                id: addMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.createTask(newTaskInput.text, projectPicker.currentText)
+          MouseArea {
+            id: addRowMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              addDialog.open()
+              newTaskInput.forceActiveFocus()
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------- add dialog
+  // A small centered layer-shell window that CAN take keyboard focus,
+  // unlike the popup. Type a title, pick a project, Enter to create.
+  PanelWindow {
+    id: addDialog
+
+    property bool accepted: false
+
+    visible: false
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    WlrLayershell.namespace: "omarchy-vikunja-add"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    exclusionMode: ExclusionMode.Ignore
+
+    function open() {
+      newTaskInput.text = ""
+      accepted = false
+      visible = true
+      newTaskInput.forceActiveFocus()
+    }
+
+    function close() {
+      visible = false
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      onClicked: addDialog.close()
+    }
+
+    Rectangle {
+      anchors.centerIn: parent
+      width: Style.space(420)
+      height: dialogColumn.implicitHeight + Style.space(24)
+      radius: Style.space(12)
+      color: Color.popups.background
+
+      ColumnLayout {
+        id: dialogColumn
+        anchors.fill: parent
+        anchors.margins: Style.space(12)
+        spacing: Style.space(8)
+
+        Text {
+          text: "New task"
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.subtitle
+          font.bold: true
+        }
+
+        TextField {
+          id: newTaskInput
+          Layout.fillWidth: true
+          placeholderText: "Task title…"
+          color: Color.foreground
+          placeholderTextColor: root.themeSecondary
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          background: Rectangle {
+            implicitWidth: Style.space(320)
+            implicitHeight: Style.space(32)
+            radius: Style.space(8)
+            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+            border.width: newTaskInput.activeFocus ? 1 : 0
+            border.color: Color.accent
+          }
+          onAccepted: {
+            addDialog.accepted = true
+            root.createTask(newTaskInput.text, projectPicker.currentText)
+            addDialog.close()
+          }
+          Keys.onEscapePressed: addDialog.close()
+        }
+
+        ComboBox {
+          id: projectPicker
+          Layout.fillWidth: true
+          model: {
+            var names = []
+            if (root.state && root.state.projects)
+              for (var i = 0; i < root.state.projects.length; i++)
+                names.push(root.state.projects[i].title)
+            return names
+          }
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+
+          Item { Layout.fillWidth: true }
+
+          Rectangle {
+            implicitWidth: cancelText.implicitWidth + Style.space(20)
+            implicitHeight: cancelText.implicitHeight + Style.space(10)
+            radius: Style.space(8)
+            color: cancelMouse.containsMouse
+              ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
+              : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+
+            Text {
+              id: cancelText
+              anchors.centerIn: parent
+              text: "Cancel"
+              color: Color.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+
+            MouseArea {
+              id: cancelMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: addDialog.close()
+            }
+          }
+
+          Rectangle {
+            implicitWidth: addText.implicitWidth + Style.space(20)
+            implicitHeight: addText.implicitHeight + Style.space(10)
+            radius: Style.space(8)
+            color: addOkMouse.containsMouse ? Qt.lighter(Color.accent, 1.15) : Color.accent
+
+            Text {
+              id: addText
+              anchors.centerIn: parent
+              text: "Add"
+              color: Color.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+
+            MouseArea {
+              id: addOkMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                addDialog.accepted = true
+                root.createTask(newTaskInput.text, projectPicker.currentText)
+                addDialog.close()
               }
             }
           }
