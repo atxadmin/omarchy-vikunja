@@ -74,6 +74,7 @@ Panel {
   FileView {
     id: stateFile
     path: root.statePath
+    watchChanges: true
     onFileChanged: root.reload()
     onLoaded: root.reload()
   }
