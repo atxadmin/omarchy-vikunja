@@ -47,13 +47,13 @@ Panel {
     runCollector(["--write"])
   }
 
-  function toggleTask(taskId) {
-    runCollector(["--toggle", String(taskId), "--done"])
-    // The collector rewrites the state file; the FileView watcher picks it
-    // up and both the label and the list rebind. Refresh right after so
-    // counts settle even if the write races the toggle.
-    Quickshell.execDetached(["bash", "-c",
-      "sleep 1; python3 '" + pluginDir + "/collect.py' --write"])
+  function toggleTask(taskId, markDone) {
+    // One collector run does the POST and rewrites the state file, so the
+    // FileView watcher fires once with the task already moved.
+    var args = ["--toggle", String(taskId)]
+    if (markDone) args.push("--done")
+    args.push("--write")
+    runCollector(args)
   }
 
   function createTask(title, projectTitle) {
@@ -355,7 +355,7 @@ Panel {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onClicked: root.toggleTask(taskCard.modelData.id)
+                  onClicked: root.toggleTask(taskCard.modelData.id, true)
                 }
 
                 RowLayout {
@@ -407,6 +407,131 @@ Panel {
                       font.pixelSize: Style.font.body
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+        // Completed section: every task checked off lands here, newest
+        // first, so an accidental click is always visible and recoverable
+        // by clicking the card again (which un-completes it).
+        Rectangle {
+          Layout.fillWidth: true
+          visible: root.state && root.state.completed && root.state.completed.length > 0
+          implicitHeight: completedHeaderRow.implicitHeight + Style.space(8)
+          radius: Style.space(8)
+          color: completedHeaderMouse.containsMouse ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.10)
+               : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.05)
+
+          RowLayout {
+            id: completedHeaderRow
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(10)
+            anchors.rightMargin: Style.space(10)
+            spacing: Style.space(8)
+
+            Text {
+              text: "Completed"
+              color: Color.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
+            }
+
+            Text {
+              Layout.fillWidth: true
+              text: root.state && root.state.completed
+                ? "(" + root.state.completed.length + ")" : ""
+              color: root.themeSecondary
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+
+            Text {
+              text: popup.collapsed["Completed"] ? "▸" : "▾"
+              color: Color.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+          }
+
+          MouseArea {
+            id: completedHeaderMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              var next = {}
+              for (var key in popup.collapsed) next[key] = popup.collapsed[key]
+              if (next["Completed"]) delete next["Completed"]
+              else next["Completed"] = true
+              popup.collapsed = next
+            }
+          }
+        }
+
+        Repeater {
+          model: root.state && root.state.completed ? root.state.completed : []
+
+          Rectangle {
+            required property var modelData
+            id: doneCard
+            Layout.fillWidth: true
+            visible: popup.collapsed["Completed"] !== true
+            Layout.preferredHeight: doneRow.implicitHeight + Style.space(16)
+            radius: Style.space(10)
+            color: doneMouse.containsMouse
+              ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.11)
+              : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
+
+            Behavior on color { ColorAnimation { duration: 90 } }
+
+            // Click a completed card to un-complete it (accidental-click
+            // recovery without leaving the panel).
+            MouseArea {
+              id: doneMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleTask(doneCard.modelData.id, false)
+            }
+
+            RowLayout {
+              id: doneRow
+              anchors.fill: parent
+              anchors.leftMargin: Style.space(12)
+              anchors.rightMargin: Style.space(12)
+              spacing: Style.space(10)
+
+              Text {
+                Layout.alignment: Qt.AlignVCenter
+                text: "✓"
+                color: Color.accent
+                font.pixelSize: Style.font.body
+              }
+
+              ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Style.space(1)
+
+                Text {
+                  Layout.fillWidth: true
+                  text: doneCard.modelData.title
+                  textFormat: Text.PlainText
+                  color: root.themeSecondary
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.subtitle
+                  font.strikeout: true
+                  wrapMode: Text.WordWrap
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  visible: doneCard.modelData.project !== ""
+                  text: doneCard.modelData.project
+                  color: root.themeSecondary
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.body
                 }
               }
             }

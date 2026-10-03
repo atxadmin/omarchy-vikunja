@@ -87,6 +87,7 @@ def fetch_state(base, token):
     # rejects project-scoped API tokens on some Vikunja versions, and we need
     # the project list anyway, so one request per project is the robust path.
     proj_out = []
+    done_out = []
     total = 0
     overdue = 0
     due_today = 0
@@ -97,6 +98,12 @@ def fetch_state(base, token):
         items = []
         for t in data:
             if t.get("done"):
+                done_out.append({
+                    "id": t["id"],
+                    "title": t.get("title", ""),
+                    "project": pr.get("title", ""),
+                    "done_at": t.get("done_at") or "",
+                })
                 continue
             due = parse_due(t)
             is_overdue = bool(due and due < today)
@@ -126,6 +133,9 @@ def fetch_state(base, token):
         "overdue": overdue,
         "due_today": due_today,
         "projects": proj_out,
+        # Most recently finished first, so an accidentally completed task
+        # is the first thing under "Completed".
+        "completed": sorted(done_out, key=lambda t: t["done_at"], reverse=True),
     }
 
 
