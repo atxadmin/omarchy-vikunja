@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "com.burtoncommand.vikunja",
+  "name": "Vikunja Tasks",
+  "version": "0.1.0",
+  "author": "burtoncommand",
+  "license": "MIT",
+  "description": "Vikunja task count in the bar, with a panel to browse and complete tasks from your self-hosted Vikunja instance.",
+  "kinds": ["service", "bar-widget", "panel"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "bar-widget": "BarWidget.qml",
+    "panel": "Panel.qml"
+  }
+}
