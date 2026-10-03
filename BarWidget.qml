@@ -117,8 +117,8 @@ Panel {
     bar: root.bar
     owner: root
     open: root.opened
-    contentWidth: Style.space(190)
-    contentHeight: Math.min(Style.space(300), popup.availableCardHeight)
+    contentWidth: Style.space(300)
+    contentHeight: Math.min(Style.space(400), popup.availableCardHeight)
 
     Flickable {
       anchors.fill: parent
@@ -157,12 +157,12 @@ Panel {
                 required property var modelData
                 id: taskRow
                 Layout.fillWidth: true
-                spacing: Style.space(2)
+                spacing: Style.space(3)
 
                 Rectangle {
-                  Layout.preferredWidth: Style.space(5)
-                  Layout.preferredHeight: Style.space(5)
-                  radius: Style.space(1)
+                  Layout.preferredWidth: Style.space(10)
+                  Layout.preferredHeight: Style.space(10)
+                  radius: Style.space(2)
                   color: "transparent"
                   border.width: 1
                   border.color: taskRow.modelData.due && taskRow.modelData.due.overdue
@@ -184,7 +184,7 @@ Panel {
                   text: taskRow.modelData.title
                   color: root.barForeground
                   font.family: Style.font.family
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: Style.font.subtitle
                   wrapMode: Text.WordWrap
                 }
 
@@ -198,7 +198,7 @@ Panel {
                       ? root.themeWarning
                       : root.themeSecondary
                   font.family: Style.font.family
-                  font.pixelSize: Style.font.caption
+                  font.pixelSize: Style.font.body
                 }
               }
             }
