@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -9,8 +10,8 @@ import Quickshell.Io
 PanelWindow {
   id: root
 
-  required property var manifest
-  property var shell
+  property var manifest: null
+  property var shell: null
 
   readonly property string pluginDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
   readonly property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") || "") + "/.local/state"
@@ -146,7 +147,8 @@ PanelWindow {
                   font.pointSize: 9
                 }
                 MouseArea {
-                  anchors.fill: parent
+                  Layout.fillWidth: true
+                  Layout.fillHeight: true
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     if (confirm("Mark '%1' as done?".arg(task.modelData.title)))

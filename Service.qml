@@ -8,6 +8,9 @@ import Quickshell.Io
 Item {
   id: root
 
+  property var manifest: null
+  property var shell: null
+
   readonly property string pluginDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
   readonly property string collector: pluginDir + "/collect.py"
   readonly property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") || "") + "/.local/state"

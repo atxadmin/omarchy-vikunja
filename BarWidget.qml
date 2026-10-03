@@ -1,11 +1,13 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "../services" as QS
 
 // Bar widget: shows the open-task count, red when anything is overdue.
 Item {
   id: root
+
+  property var manifest: null
+  property var shell: null
 
   readonly property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") || "") + "/.local/state"
   readonly property string statePath: stateHome + "/omarchy/plugins/vikunja/tasks.json"
