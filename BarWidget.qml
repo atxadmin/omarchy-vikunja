@@ -14,6 +14,9 @@ Item {
 
   property var state: null
 
+  implicitWidth: label.implicitWidth + 16
+  implicitHeight: label.implicitHeight + 8
+
   FileView {
     id: stateFile
     path: root.statePath
