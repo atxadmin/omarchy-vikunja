@@ -3,14 +3,15 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 
 // Bar widget + task panel in one entry point, the way the shell expects:
 // the widget root extends Ui.Panel (open/close/opened lifecycle + IPC),
-// the count label is the bar face, and the task list lives in a PopupCard
-// anchored under it.
+// the count label is the bar face, and the task list lives in a
+// KeyboardPanel anchored under it. KeyboardPanel (unlike PopupCard) is a
+// layer-shell PanelWindow, so the quick-add TextField actually receives
+// keystrokes — the same approach derekross/omarchy-tasks uses.
 Panel {
   id: root
 
@@ -126,7 +127,7 @@ Panel {
 
   // ------------------------------------------------------------------ panel
 
-  PopupCard {
+  KeyboardPanel {
     id: popup
 
     anchorItem: face
@@ -135,10 +136,15 @@ Panel {
     open: root.opened
     contentWidth: Style.space(420)
     contentHeight: Math.min(Style.space(500), popup.availableCardHeight)
+    focusTarget: newTaskInput
 
     // Project sections remember their folded state by title, so a fold
     // survives the list rebuilding on every collector write.
     property var collapsed: ({})
+
+    PanelKeyCatcher {
+      onEscapePressed: popup.close()
+    }
 
     Flickable {
       anchors.fill: parent
@@ -206,6 +212,46 @@ Panel {
               cursorShape: Qt.PointingHandCursor
               onClicked: root.refresh()
             }
+          }
+        }
+
+        // Quick-add line, the omarchy-tasks pattern: type a title, pick
+        // a project, press Enter. Works because KeyboardPanel is a
+        // layer-shell window that takes real keyboard focus.
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+
+          TextField {
+            id: newTaskInput
+            Layout.fillWidth: true
+            placeholderText: "Add a task…"
+            color: Color.foreground
+            placeholderTextColor: root.themeSecondary
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            background: Rectangle {
+              implicitHeight: Style.space(32)
+              radius: Style.space(8)
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+              border.width: newTaskInput.activeFocus ? 1 : 0
+              border.color: Color.accent
+            }
+            onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText)
+          }
+
+          ComboBox {
+            id: projectPicker
+            Layout.preferredWidth: Style.space(130)
+            model: {
+              var names = []
+              if (root.state && root.state.projects)
+                for (var i = 0; i < root.state.projects.length; i++)
+                  names.push(root.state.projects[i].title)
+              return names
+            }
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
           }
         }
 
@@ -362,214 +408,6 @@ Panel {
                     }
                   }
                 }
-              }
-            }
-          }
-        }
-
-        // ------------------------------------------------------------- create
-        // The stock PopupCard cannot take keyboard focus (its window type
-        // won't accept the layer-shell focus attachment), so an inline
-        // TextField would be dead. Instead an "+ Add task" button opens a
-        // small focused PanelWindow, the same approach the clipboard
-        // plugin's search box uses.
-        Rectangle {
-          Layout.fillWidth: true
-          implicitHeight: addLabel.implicitHeight + Style.space(16)
-          radius: Style.space(10)
-          color: addRowMouse.containsMouse
-            ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.11)
-            : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
-
-          Behavior on color { ColorAnimation { duration: 90 } }
-
-          RowLayout {
-            id: addLabel
-            anchors.fill: parent
-            anchors.leftMargin: Style.space(12)
-            anchors.rightMargin: Style.space(12)
-            spacing: Style.space(8)
-
-            Text {
-              text: "+ Add task"
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-            }
-
-            Text {
-              Layout.fillWidth: true
-              visible: root.state && root.state.projects
-              text: "in " + (projectPicker.displayText || "")
-              color: root.themeSecondary
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-            }
-          }
-
-          MouseArea {
-            id: addRowMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              addDialog.open()
-              newTaskInput.forceActiveFocus()
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // ------------------------------------------------------------- add dialog
-  // A small centered layer-shell window that CAN take keyboard focus,
-  // unlike the popup. Type a title, pick a project, Enter to create.
-  PanelWindow {
-    id: addDialog
-
-    property bool accepted: false
-
-    visible: false
-    anchors { top: true; bottom: true; left: true; right: true }
-    color: "transparent"
-    WlrLayershell.namespace: "omarchy-vikunja-add"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-
-    function open() {
-      newTaskInput.text = ""
-      accepted = false
-      visible = true
-      newTaskInput.forceActiveFocus()
-    }
-
-    function close() {
-      visible = false
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: addDialog.close()
-    }
-
-    Rectangle {
-      anchors.centerIn: parent
-      width: Style.space(420)
-      height: dialogColumn.implicitHeight + Style.space(24)
-      radius: Style.space(12)
-      color: Color.popups.background
-
-      ColumnLayout {
-        id: dialogColumn
-        anchors.fill: parent
-        anchors.margins: Style.space(12)
-        spacing: Style.space(8)
-
-        Text {
-          text: "New task"
-          color: Color.foreground
-          font.family: Style.font.family
-          font.pixelSize: Style.font.subtitle
-          font.bold: true
-        }
-
-        TextField {
-          id: newTaskInput
-          Layout.fillWidth: true
-          placeholderText: "Task title…"
-          color: Color.foreground
-          placeholderTextColor: root.themeSecondary
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-          background: Rectangle {
-            implicitWidth: Style.space(320)
-            implicitHeight: Style.space(32)
-            radius: Style.space(8)
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-            border.width: newTaskInput.activeFocus ? 1 : 0
-            border.color: Color.accent
-          }
-          onAccepted: {
-            addDialog.accepted = true
-            root.createTask(newTaskInput.text, projectPicker.currentText)
-            addDialog.close()
-          }
-          Keys.onEscapePressed: addDialog.close()
-        }
-
-        ComboBox {
-          id: projectPicker
-          Layout.fillWidth: true
-          model: {
-            var names = []
-            if (root.state && root.state.projects)
-              for (var i = 0; i < root.state.projects.length; i++)
-                names.push(root.state.projects[i].title)
-            return names
-          }
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(8)
-
-          Item { Layout.fillWidth: true }
-
-          Rectangle {
-            implicitWidth: cancelText.implicitWidth + Style.space(20)
-            implicitHeight: cancelText.implicitHeight + Style.space(10)
-            radius: Style.space(8)
-            color: cancelMouse.containsMouse
-              ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.12)
-              : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.06)
-
-            Text {
-              id: cancelText
-              anchors.centerIn: parent
-              text: "Cancel"
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-            }
-
-            MouseArea {
-              id: cancelMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: addDialog.close()
-            }
-          }
-
-          Rectangle {
-            implicitWidth: addText.implicitWidth + Style.space(20)
-            implicitHeight: addText.implicitHeight + Style.space(10)
-            radius: Style.space(8)
-            color: addOkMouse.containsMouse ? Qt.lighter(Color.accent, 1.15) : Color.accent
-
-            Text {
-              id: addText
-              anchors.centerIn: parent
-              text: "Add"
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              font.bold: true
-            }
-
-            MouseArea {
-              id: addOkMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: {
-                addDialog.accepted = true
-                root.createTask(newTaskInput.text, projectPicker.currentText)
-                addDialog.close()
               }
             }
           }
