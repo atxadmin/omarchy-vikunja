@@ -75,7 +75,7 @@ Panel {
     id: stateFile
     path: root.statePath
     watchChanges: true
-    onFileChanged: root.reload()
+    onFileChanged: stateFile.reload()  // reload() re-reads disk, then onLoaded parses fresh text
     onLoaded: root.reload()
   }
 
