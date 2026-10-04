@@ -314,85 +314,101 @@ Panel {
           }
         }
 
-        // Quick-add: type a title, pick the destination list, press Enter
-        // or hit Add. Defaults to the Daniel list whenever state loads.
-        RowLayout {
+        // Quick-add: two-row task box on top, pickers below it. Type a
+        // title, pick list + due date, press Enter or hit Add. Defaults
+        // to the Daniel list whenever state loads.
+        ColumnLayout {
           Layout.fillWidth: true
           spacing: Style.space(6)
 
-          TextField {
-            id: newTaskInput
+          RowLayout {
             Layout.fillWidth: true
-            placeholderText: "Add a task…"
-            color: Color.foreground
-            placeholderTextColor: root.themeSecondary
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
-            background: Rectangle {
-              implicitHeight: Style.space(32)
-              radius: Style.space(8)
-              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
-              border.width: newTaskInput.activeFocus ? 1 : 0
-              border.color: Color.accent
-            }
-            onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
-          }
+            spacing: Style.space(6)
 
-          ComboBox {
-            id: duePicker
-            Layout.preferredWidth: Style.space(110)
-            model: {
-              var labels = []
-              for (var i = 0; i < root.dueChoices.length; i++)
-                labels.push(root.dueChoices[i].label)
-              return labels
-            }
-            currentIndex: 0
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
-          }
-
-          ComboBox {
-            id: projectPicker
-            Layout.preferredWidth: Style.space(120)
-            model: {
-              var names = []
-              var projects = root.sortedProjects()
-              for (var i = 0; i < projects.length; i++)
-                names.push(projects[i].title)
-              return names
-            }
-            // Default to the Daniel list on every state rebuild.
-            onModelChanged: {
-              currentIndex = Math.max(0, find("Daniel"))
-            }
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
-          }
-
-          Rectangle {
-            Layout.preferredWidth: addBtnLabel.implicitWidth + Style.space(16)
-            Layout.preferredHeight: Style.space(32)
-            radius: Style.space(8)
-            color: addBtnMouse.containsMouse ? Qt.lighter(Color.accent, 1.15) : Color.accent
-            Behavior on color { ColorAnimation { duration: 90 } }
-
-            Text {
-              id: addBtnLabel
-              anchors.centerIn: parent
-              text: "Add"
-              color: Color.background
+            TextField {
+              id: newTaskInput
+              Layout.fillWidth: true
+              placeholderText: "Add a task…"
+              color: Color.foreground
+              placeholderTextColor: root.themeSecondary
               font.family: Style.font.family
               font.pixelSize: Style.font.body
-              font.bold: true
+              wrapMode: TextInput.Wrap
+              verticalAlignment: TextInput.AlignVCenter
+              leftPadding: Style.space(10)
+              rightPadding: Style.space(10)
+              background: Rectangle {
+                // Two rows tall so longer titles stay readable.
+                implicitHeight: Style.space(64)
+                radius: Style.space(8)
+                color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.08)
+                border.width: newTaskInput.activeFocus ? 1 : 0
+                border.color: Color.accent
+              }
+              onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
             }
 
-            MouseArea {
-              id: addBtnMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
+            Rectangle {
+              Layout.preferredWidth: addBtnLabel.implicitWidth + Style.space(16)
+              Layout.preferredHeight: Style.space(64)
+              radius: Style.space(8)
+              color: addBtnMouse.containsMouse ? Qt.lighter(Color.accent, 1.15) : Color.accent
+              Behavior on color { ColorAnimation { duration: 90 } }
+
+              Text {
+                id: addBtnLabel
+                anchors.centerIn: parent
+                text: "Add"
+                color: Color.background
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
+
+              MouseArea {
+                id: addBtnMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
+              }
+            }
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.space(6)
+
+            ComboBox {
+              id: duePicker
+              Layout.preferredWidth: Style.space(110)
+              model: {
+                var labels = []
+                for (var i = 0; i < root.dueChoices.length; i++)
+                  labels.push(root.dueChoices[i].label)
+                return labels
+              }
+              currentIndex: 0
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+
+            ComboBox {
+              id: projectPicker
+              Layout.fillWidth: true
+              model: {
+                var names = []
+                var projects = root.sortedProjects()
+                for (var i = 0; i < projects.length; i++)
+                  names.push(projects[i].title)
+                return names
+              }
+              // Default to the Daniel list on every state rebuild.
+              onModelChanged: {
+                currentIndex = Math.max(0, find("Daniel"))
+              }
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
             }
           }
         }
