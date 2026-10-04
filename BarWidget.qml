@@ -115,6 +115,18 @@ Panel {
     return rows
   }
 
+  function setDue(taskId, days) {
+    // Positive days sets a date N days out; null clears the due date.
+    if (days === null) {
+      runCollector(["--set-due", String(taskId), "--write"])
+      return
+    }
+    var d = new Date()
+    d.setDate(d.getDate() + days)
+    var iso = Qt.formatDate(d, "yyyy-MM-dd")
+    runCollector(["--set-due", String(taskId), "--due", iso, "--write"])
+  }
+
   function dueLabel(task) {
     if (!task.due) return ""
     if (task.overdue) return "Overdue"
@@ -523,6 +535,55 @@ Panel {
                 color: root.dueColor(taskCard.modelData)
                 font.family: Style.font.family
                 font.pixelSize: Style.font.body
+              }
+            }
+
+            // Due-date quick buttons, shown only on hover so the list
+            // stays clean. Must sit above the card's MouseArea to win
+            // clicks; the card itself still toggles on the rest of it.
+            Row {
+              id: dueRow
+              visible: cardMouse.containsMouse
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(8)
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Style.space(4)
+              spacing: Style.space(4)
+
+              Repeater {
+                model: [
+                  { label: "T", days: 0 },
+                  { label: "T+1", days: 1 },
+                  { label: "+1w", days: 7 },
+                  { label: "✕", days: null }
+                ]
+
+                Rectangle {
+                  required property var modelData
+                  width: dueBtnLabel.implicitWidth + Style.space(8)
+                  height: Style.space(20)
+                  radius: height / 2
+                  color: dueBtnMouse.containsMouse
+                    ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.25)
+                    : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.14)
+
+                  Text {
+                    id: dueBtnLabel
+                    anchors.centerIn: parent
+                    text: modelData.label
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                  }
+
+                  MouseArea {
+                    id: dueBtnMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.setDue(taskCard.modelData.id, modelData.days)
+                  }
+                }
               }
             }
           }

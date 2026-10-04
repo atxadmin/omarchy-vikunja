@@ -30,7 +30,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 CONFIG_PATH = Path.home() / ".config" / "omarchy-vikunja" / "config.json"
@@ -70,7 +70,10 @@ def parse_due(task):
     if not d:
         return None
     try:
-        due = datetime.fromisoformat(d.replace("Z", "+00:00")).date()
+        due = datetime.fromisoformat(d.replace("Z", "+00:00"))
+        if due.tzinfo is not None:
+            due = due.astimezone(timezone.utc)  # Vikunja echoes UTC midnights as local eve; use the UTC date
+        due = due.date()
     except ValueError:
         return None
     # Vikunja uses 0001-01-01 as its zero value for "no due date".
@@ -115,7 +118,9 @@ def fetch_state(base, token):
             items.append({
                 "id": t["id"],
                 "title": t.get("title", ""),
-                "due": t.get("due_date") if due else None,
+                # Normalized UTC date, not the raw echo (Vikunja returns UTC
+                # midnights as local 7pm the day before).
+                "due": due.isoformat() if due else None,
                 "overdue": is_overdue,
                 "due_today": is_today,
             })
@@ -150,6 +155,19 @@ def toggle_task(base, token, task_id, target_done):
         sys.exit(3)
 
 
+def set_due(base, token, task_id, due):
+    # Same partial-update endpoint as toggle: POST /tasks/{id}.
+    # Vikunja 2.x rejects date-only strings with HTTP 400; pad to a
+    # midnight UTC timestamp. None clears the due date.
+    if due:
+        due = due[:10] + "T00:00:00Z"
+    payload = {"due_date": due}
+    updated = api(base, token, "POST", "/tasks/%d" % task_id, payload)
+    if not updated.get("id"):
+        print("ERROR: due date not confirmed for task %d" % task_id, file=sys.stderr)
+        sys.exit(3)
+
+
 def create_task(base, token, title, project_id, due=None):
     # Create = PUT /projects/{id}/tasks on Vikunja 2.x.
     payload = {"title": title}
@@ -175,7 +193,9 @@ def main():
     ap.add_argument("--project", type=int, metavar="PROJECT_ID",
                     help="with --create: project to add the task to")
     ap.add_argument("--due", metavar="YYYY-MM-DD",
-                    help="with --create: due date")
+                    help="with --create: due date; with --set-due: new due date")
+    ap.add_argument("--set-due", type=int, metavar="TASK_ID",
+                    help="set the due date of an existing task (use --due, or omit to clear)")
     args = ap.parse_args()
 
     if args.clear:
@@ -187,6 +207,9 @@ def main():
 
     if args.toggle:
         toggle_task(base, token, args.toggle, args.done)
+
+    if args.set_due:
+        set_due(base, token, args.set_due, args.due)
 
     if args.create:
         if not args.project:
