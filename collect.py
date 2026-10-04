@@ -159,20 +159,30 @@ def set_due(base, token, task_id, due):
     # Same partial-update endpoint as toggle: POST /tasks/{id}.
     # Vikunja 2.x rejects date-only strings with HTTP 400; pad to a
     # midnight UTC timestamp. None clears the due date.
-    if due:
-        due = due[:10] + "T00:00:00Z"
-    payload = {"due_date": due}
+    payload = {"due_date": pad_due(due)}
     updated = api(base, token, "POST", "/tasks/%d" % task_id, payload)
     if not updated.get("id"):
         print("ERROR: due date not confirmed for task %d" % task_id, file=sys.stderr)
         sys.exit(3)
 
 
+def pad_due(due):
+    """Normalize a due-date argument to a full UTC midnight timestamp.
+
+    Vikunja 2.x rejects date-only strings with HTTP 400, so pad. None/empty
+    returns None (means: no due date / clear it).
+    """
+    if not due:
+        return None
+    return due[:10] + "T00:00:00Z"
+
+
 def create_task(base, token, title, project_id, due=None):
-    # Create = PUT /projects/{id}/tasks on Vikunja 2.x.
+    # Create = PUT /projects/{id}/tasks on Vikunja 2.x. Due dates must be
+    # full timestamps, same as --set-due (see pad_due).
     payload = {"title": title}
     if due:
-        payload["due_date"] = due
+        payload["due_date"] = pad_due(due)
     created = api(base, token, "PUT", "/projects/%d/tasks" % project_id, payload)
     if not created.get("id"):
         print("ERROR: task not confirmed created", file=sys.stderr)

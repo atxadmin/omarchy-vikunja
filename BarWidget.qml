@@ -64,7 +64,7 @@ Panel {
     runCollector(args)
   }
 
-  function createTask(title, projectTitle) {
+  function createTask(title, projectTitle, dueChoice) {
     title = String(title || "").trim()
     if (title === "") return
     var projectId = 0
@@ -75,9 +75,24 @@ Panel {
           break
         }
     if (projectId === 0) return
-    runCollector(["--create", title, "--project", String(projectId), "--write"])
+    var args = ["--create", title, "--project", String(projectId)]
+    if (dueChoice && dueChoice.key !== "none") {
+      var d = new Date()
+      d.setDate(d.getDate() + dueChoice.days)
+      args = args.concat(["--due", Qt.formatDate(d, "yyyy-MM-dd")])
+    }
+    args.push("--write")
+    runCollector(args)
     newTaskInput.text = ""
   }
+
+  // Quick-add due-date choices; the ISO date is computed at submit time.
+  readonly property var dueChoices: [
+    { key: "none", label: "No date", days: -1 },
+    { key: "today", label: "Today", days: 0 },
+    { key: "tomorrow", label: "Tomorrow", days: 1 },
+    { key: "week", label: "Next week", days: 7 }
+  ]
 
   // Projects with Daniel pinned first; everything else keeps collector order.
   function sortedProjects() {
@@ -320,7 +335,21 @@ Panel {
               border.width: newTaskInput.activeFocus ? 1 : 0
               border.color: Color.accent
             }
-            onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText)
+            onAccepted: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
+          }
+
+          ComboBox {
+            id: duePicker
+            Layout.preferredWidth: Style.space(110)
+            model: {
+              var labels = []
+              for (var i = 0; i < root.dueChoices.length; i++)
+                labels.push(root.dueChoices[i].label)
+              return labels
+            }
+            currentIndex: 0
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
           }
 
           ComboBox {
@@ -363,7 +392,7 @@ Panel {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: root.createTask(newTaskInput.text, projectPicker.currentText)
+              onClicked: root.createTask(newTaskInput.text, projectPicker.currentText, root.dueChoices[duePicker.currentIndex])
             }
           }
         }
